@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  customer
+  staff
+  admin
+}
+
+enum StockStatus {
+  in_stock
+  out_of_stock
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  preparing
+  ready
+  shipping
+  delivered
+  complete
+  cancelled
+}
+
+enum PaymentStatus {
+  unpaid
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum PaymentMethod {
+  cod
+  momo
+  vnpay
+}
+
+enum VoucherType {
+  percent
+  fixed
+  free_shipping
+}
+
+enum LoyaltyTier {
+  silver
+  gold
+  diamond
+}
+
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+}
+
+model User {
+  id           String               @id @default(cuid())
+  phone        String               @unique
+  email        String?              @unique
+  passwordHash String
+  name         String
+  role         UserRole             @default(customer)
+  createdAt    DateTime             @default(now())
+  addresses    UserAddress[]
+  orders       Order[]
+  bookings     Booking[]
+  loyalty      LoyaltyAccount?
+  voucherUses  VoucherUsage[]
+}
+
+model UserAddress {
+  id        String  @id @default(cuid())
+  userId    String
+  label     String
+  address   String
+  lat       Float?
+  lng       Float?
+  isDefault Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id])
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  sortOrder Int        @default(0)
+  isActive  Boolean    @default(true)
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id          String       @id @default(cuid())
+  categoryId  String
+  name        String
+  description String
+  price       Int
+  images      String[]
+  isActive    Boolean      @default(true)
+  stockStatus StockStatus  @default(in_stock)
+  isFlashSale Boolean      @default(false)
+  category    Category     @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id             String        @id @default(cuid())
+  userId         String?
+  customerName   String
+  customerPhone  String
+  address        String
+  status         OrderStatus   @default(pending)
+  subtotal       Int
+  shippingFee    Int
+  discount       Int           @default(0)
+  total          Int
+  paymentMethod  PaymentMethod
+  paymentStatus  PaymentStatus @default(unpaid)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User?         @relation(fields: [userId], references: [id])
+  items          OrderItem[]
+  voucherUses    VoucherUsage[]
+  loyaltyTxs     LoyaltyTransaction[]
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  itemId    String
+  quantity  Int
+  unitPrice Int
+  note      String?
+  order     Order    @relation(fields: [orderId], references: [id])
+  item      MenuItem @relation(fields: [itemId], references: [id])
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  userId        String?
+  customerName  String
+  customerPhone String
+  date          DateTime
+  time          String
+  seats         Int
+  tableId       String?
+  depositAmount Int           @default(0)
+  status        BookingStatus @default(pending)
+  createdAt     DateTime      @default(now())
+  user          User?         @relation(fields: [userId], references: [id])
+}
+
+model Voucher {
+  id          String         @id @default(cuid())
+  code        String         @unique
+  name        String
+  type        VoucherType
+  value       Int
+  maxDiscount Int?
+  minOrder    Int
+  startAt     DateTime
+  endAt       DateTime
+  totalQty    Int
+  usedQty     Int            @default(0)
+  isActive    Boolean        @default(true)
+  usages      VoucherUsage[]
+}
+
+model VoucherUsage {
+  id        String   @id @default(cuid())
+  voucherId String
+  userId    String?
+  orderId   String?
+  usedAt    DateTime @default(now())
+  voucher   Voucher  @relation(fields: [voucherId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+  order     Order?   @relation(fields: [orderId], references: [id])
+}
+
+model LoyaltyAccount {
+  id        String      @id @default(cuid())
+  userId    String      @unique
+  points    Int         @default(0)
+  tier      LoyaltyTier @default(silver)
+  user      User        @relation(fields: [userId], references: [id])
+}
+
+model LoyaltyTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  orderId     String?
+  pointsDelta Int
+  type        String
+  createdAt   DateTime @default(now())
+  order       Order?   @relation(fields: [orderId], references: [id])
+}
+
